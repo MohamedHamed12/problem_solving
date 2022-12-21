@@ -11,3 +11,5 @@ i solved in
 
 ## [leetcode](https://github.com/MohamedHamed12/problem_solving/tree/main/leetcode)
 [account](https://leetcode.com/Mohamedh/)
+
+## [hakerrank](https://www.hackerrank.com/mh1779371)
