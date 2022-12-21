@@ -7,7 +7,7 @@ you can improve your skill to use python well
 
 i solved in 
 ## [codeforces](https://github.com/MohamedHamed12/problem_solving/tree/main/codefoeces)
-[account]()
+[account](https://codeforces.com/profile/MohamedHamed123)
 
 ## [leetcode](https://github.com/MohamedHamed12/problem_solving/tree/main/leetcode)
-[account]()
+[account](https://leetcode.com/Mohamedh/)
