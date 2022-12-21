@@ -9,5 +9,5 @@ i solved in
 ## [codeforces](https://github.com/MohamedHamed12/problem_solving/tree/main/codefoeces)
 [account]()
 
-##[leetcode](https://github.com/MohamedHamed12/problem_solving/tree/main/leetcode)
+## [leetcode](https://github.com/MohamedHamed12/problem_solving/tree/main/leetcode)
 [account]()
