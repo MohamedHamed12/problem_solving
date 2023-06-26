@@ -1392,3 +1392,994 @@
         ```
         
 - behavior Design Patterns
+    - Chain of responsibility
+        
+        ```python
+        """
+        *What is this pattern about?
+        
+        The Chain of responsibility is an object oriented version of the
+        `if ... elif ... elif ... else ...` idiom, with the
+        benefit that the condition–action blocks can be dynamically rearranged
+        and reconfigured at runtime.
+        
+        This pattern aims to decouple the senders of a request from its
+        receivers by allowing request to move through chained
+        receivers until it is handled.
+        
+        Request receiver in simple form keeps a reference to a single successor.
+        As a variation some receivers may be capable of sending requests out
+        in several directions, forming a `tree of responsibility`.
+        
+        *TL;DR
+        Allow a request to pass down a chain of receivers until it is handled.
+        """
+        
+        from abc import ABC, abstractmethod
+        from typing import Optional, Tuple
+        
+        class Handler(ABC):
+            def __init__(self, successor: Optional["Handler"] = None):
+                self.successor = successor
+        
+            def handle(self, request: int) -> None:
+                """
+                Handle request and stop.
+                If can't - call next handler in chain.
+        
+                As an alternative you might even in case of success
+                call the next handler.
+                """
+                res = self.check_range(request)
+                if not res and self.successor:
+                    self.successor.handle(request)
+        
+            @abstractmethod
+            def check_range(self, request: int) -> Optional[bool]:
+                """Compare passed value to predefined interval"""
+        
+        class ConcreteHandler0(Handler):
+            """Each handler can be different.
+            Be simple and static...
+            """
+        
+            @staticmethod
+            def check_range(request: int) -> Optional[bool]:
+                if 0 <= request < 10:
+                    print(f"request {request} handled in handler 0")
+                    return True
+                return None
+        
+        class ConcreteHandler1(Handler):
+            """... With it's own internal state"""
+        
+            start, end = 10, 20
+        
+            def check_range(self, request: int) -> Optional[bool]:
+                if self.start <= request < self.end:
+                    print(f"request {request} handled in handler 1")
+                    return True
+                return None
+        
+        class ConcreteHandler2(Handler):
+            """... With helper methods."""
+        
+            def check_range(self, request: int) -> Optional[bool]:
+                start, end = self.get_interval_from_db()
+                if start <= request < end:
+                    print(f"request {request} handled in handler 2")
+                    return True
+                return None
+        
+            @staticmethod
+            def get_interval_from_db() -> Tuple[int, int]:
+                return (20, 30)
+        
+        class FallbackHandler(Handler):
+            @staticmethod
+            def check_range(request: int) -> Optional[bool]:
+                print(f"end of chain, no handler for {request}")
+                return False
+        
+        def main():
+            """
+            >>> h0 = ConcreteHandler0()
+            >>> h1 = ConcreteHandler1()
+            >>> h2 = ConcreteHandler2(FallbackHandler())
+            >>> h0.successor = h1
+            >>> h1.successor = h2
+        
+            >>> requests = [2, 5, 14, 22, 18, 3, 35, 27, 20]
+            >>> for request in requests:
+            ...     h0.handle(request)
+            request 2 handled in handler 0
+            request 5 handled in handler 0
+            request 14 handled in handler 1
+            request 22 handled in handler 2
+            request 18 handled in handler 1
+            request 3 handled in handler 0
+            end of chain, no handler for 35
+            request 27 handled in handler 2
+            request 20 handled in handler 2
+            """
+        
+        if __name__ == "__main__":
+            import doctest
+        
+            doctest.testmod(optionflags=doctest.ELLIPSIS)
+        ```
+        
+    - Command pattern
+        
+        ```python
+        
+        """
+        Command pattern decouples the object invoking a job from the one who knows
+        how to do it. As mentioned in the GoF book, a good example is in menu items.
+        You have a menu that has lots of items. Each item is responsible for doing a
+        special thing and you want your menu item just call the execute method when
+        it is pressed. To achieve this you implement a command object with the execute
+        method for each menu item and pass to it.
+        
+        *About the example
+        We have a menu containing two items. Each item accepts a file name, one hides the file
+        and the other deletes it. Both items have an undo option.
+        Each item is a MenuItem class that accepts the corresponding command as input and executes
+        it's execute method when it is pressed.
+        
+        *TL;DR
+        Object oriented implementation of callback functions.
+        
+        *Examples in Python ecosystem:
+        Django HttpRequest (without execute method):
+        https://docs.djangoproject.com/en/2.1/ref/request-response/#httprequest-objects
+        """
+        
+        from typing import List, Union
+        
+        class HideFileCommand:
+            """
+            A command to hide a file given its name
+            """
+        
+            def __init__(self) -> None:
+                # an array of files hidden, to undo them as needed
+                self._hidden_files: List[str] = []
+        
+            def execute(self, filename: str) -> None:
+                print(f"hiding {filename}")
+                self._hidden_files.append(filename)
+        
+            def undo(self) -> None:
+                filename = self._hidden_files.pop()
+                print(f"un-hiding {filename}")
+        
+        class DeleteFileCommand:
+            """
+            A command to delete a file given its name
+            """
+        
+            def __init__(self) -> None:
+                # an array of deleted files, to undo them as needed
+                self._deleted_files: List[str] = []
+        
+            def execute(self, filename: str) -> None:
+                print(f"deleting {filename}")
+                self._deleted_files.append(filename)
+        
+            def undo(self) -> None:
+                filename = self._deleted_files.pop()
+                print(f"restoring {filename}")
+        
+        class MenuItem:
+            """
+            The invoker class. Here it is items in a menu.
+            """
+        
+            def __init__(self, command: Union[HideFileCommand, DeleteFileCommand]) -> None:
+                self._command = command
+        
+            def on_do_press(self, filename: str) -> None:
+                self._command.execute(filename)
+        
+            def on_undo_press(self) -> None:
+                self._command.undo()
+        
+        def main():
+            """
+            >>> item1 = MenuItem(DeleteFileCommand())
+        
+            >>> item2 = MenuItem(HideFileCommand())
+        
+            # create a file named `test-file` to work with
+            >>> test_file_name = 'test-file'
+        
+            # deleting `test-file`
+            >>> item1.on_do_press(test_file_name)
+            deleting test-file
+        
+            # restoring `test-file`
+            >>> item1.on_undo_press()
+            restoring test-file
+        
+            # hiding `test-file`
+            >>> item2.on_do_press(test_file_name)
+            hiding test-file
+        
+            # un-hiding `test-file`
+            >>> item2.on_undo_press()
+            un-hiding test-file
+            """
+        
+        if __name__ == "__main__":
+            import doctest
+        
+            doctest.testmod()
+        #-------------------------------------------------------------------------------------------
+        from abc import ABC, abstractmethod
+        
+        # Command Interface
+        class Command(ABC):
+            @abstractmethod
+            def execute(self):
+                pass
+        
+        # Concrete Commands
+        class CopyCommand(Command):
+            def __init__(self, editor):
+                self.editor = editor
+        
+            def execute(self):
+                self.editor.copy()
+        
+        class CutCommand(Command):
+            def __init__(self, editor):
+                self.editor = editor
+        
+            def execute(self):
+                self.editor.cut()
+        
+        class PasteCommand(Command):
+            def __init__(self, editor):
+                self.editor = editor
+        
+            def execute(self):
+                self.editor.paste()
+        
+        # Receiver
+        class TextEditor:
+            def __init__(self):
+                self.clipboard = ""
+        
+            def copy(self):
+                self.clipboard = "Text copied to clipboard."
+        
+            def cut(self):
+                self.clipboard = "Text cut and copied to clipboard."
+        
+            def paste(self):
+                if self.clipboard:
+                    print("Pasting:", self.clipboard)
+                else:
+                    print("Clipboard is empty.")
+        
+        # Invoker
+        class KeyboardShortcut:
+            def __init__(self):
+                self.command = None
+        
+            def set_command(self, command):
+                self.command = command
+        
+            def execute_command(self):
+                if self.command:
+                    self.command.execute()
+        
+        # Usage example
+        text_editor = TextEditor()
+        
+        copy_command = CopyCommand(text_editor)
+        cut_command = CutCommand(text_editor)
+        paste_command = PasteCommand(text_editor)
+        
+        keyboard_shortcut = KeyboardShortcut()
+        
+        # Set commands to keyboard shortcuts
+        keyboard_shortcut.set_command(copy_command)
+        keyboard_shortcut.execute_command()  # Output: Text copied to clipboard.
+        
+        keyboard_shortcut.set_command(cut_command)
+        keyboard_shortcut.execute_command()  # Output: Text cut and copied to clipboard.
+        
+        keyboard_shortcut.set_command(paste_command)
+        keyboard_shortcut.execute_command()  # Output: Pasting: Text cut and copied to clipboard.
+        #------------------------------------------------------------------------------------------
+        ```
+        
+    - Iterator pattern
+        
+        ```python
+        '''
+        The Iterator pattern is a behavioral design pattern that provides a way to access the elements of an aggregate
+         object (such as a list or collection) sequentially without exposing its underlying representation. It allows 
+        you to iterate over the elements of a collection in a consistent and controlled manner.
+        '''
+        
+        from abc import ABC, abstractmethod
+        
+        # Iterator interface
+        class Iterator(ABC):
+            @abstractmethod
+            def has_next(self):
+                pass
+        
+            @abstractmethod
+            def next(self):
+                pass
+        
+        # Concrete Iterator
+        class ListIterator(Iterator):
+            def __init__(self, collection):
+                self.collection = collection
+                self.index = 0
+        
+            def has_next(self):
+                return self.index < len(self.collection)
+        
+            def next(self):
+                if self.has_next():
+                    element = self.collection[self.index]
+                    self.index += 1
+                    return element
+                else:
+                    raise StopIteration()
+        
+        # Aggregate interface
+        class Aggregate(ABC):
+            @abstractmethod
+            def create_iterator(self):
+                pass
+        
+        # Concrete Aggregate
+        class ListAggregate(Aggregate):
+            def __init__(self):
+                self.elements = []
+        
+            def add_element(self, element):
+                self.elements.append(element)
+        
+            def create_iterator(self):
+                return ListIterator(self.elements)
+        
+        # Usage example
+        aggregate = ListAggregate()
+        aggregate.add_element("Element 1")
+        aggregate.add_element("Element 2")
+        aggregate.add_element("Element 3")
+        
+        iterator = aggregate.create_iterator()
+        
+        while iterator.has_next():
+            element = iterator.next()
+            print(element)
+        ```
+        
+    - Mediator pattern
+        
+        ```python
+        
+        '''
+        Objects in a system communicate through a Mediator instead of directly with each other.
+        This reduces the dependencies between communicating objects, thereby reducing coupling.
+        
+        Encapsulates how a set of objects interact.
+        '''
+        # Mediator interface
+        class Mediator:
+            def send_message(self, message: str, colleague: 'Colleague'):
+                pass
+        
+        # Concrete Mediator
+        class ConcreteMediator(Mediator):
+            def __init__(self):
+                self.colleague1 = None
+                self.colleague2 = None
+        
+            def set_colleague1(self, colleague: 'Colleague'):
+                self.colleague1 = colleague
+        
+            def set_colleague2(self, colleague: 'Colleague'):
+                self.colleague2 = colleague
+        
+            def send_message(self, message: str, colleague: 'Colleague'):
+                if colleague == self.colleague1:
+                    self.colleague2.receive_message(message)
+                elif colleague == self.colleague2:
+                    self.colleague1.receive_message(message)
+        
+        # Colleague interface
+        class Colleague:
+            def __init__(self, mediator: Mediator):
+                self.mediator = mediator
+        
+            def send_message(self, message: str):
+                pass
+        
+            def receive_message(self, message: str):
+                pass
+        
+        # Concrete Colleague
+        class ConcreteColleague(Colleague):
+            def send_message(self, message: str):
+                self.mediator.send_message(message, self)
+        
+            def receive_message(self, message: str):
+                print("Received message:", message)
+        
+        # Usage
+        if __name__ == '__main__':
+            mediator = ConcreteMediator()
+            colleague1 = ConcreteColleague(mediator)
+            colleague2 = ConcreteColleague(mediator)
+        
+            mediator.set_colleague1(colleague1)
+            mediator.set_colleague2(colleague2)
+        
+            colleague1.send_message("Hello, colleague2!")
+            colleague2.send_message("Hi, colleague1!")
+        ```
+        
+    - Memento pattern
+        
+        ```python
+        "Memento pattern concept"
+        '''
+        The Memento pattern is a behavioral design pattern that allows you to capture and restore the internal state of 
+        an object without violating encapsulation. It provides a way to save and restore the previous state of an object
+         so that it can be reverted back to that state later.
+        '''
+        
+        class Memento():  # pylint: disable=too-few-public-methods
+            "A container of state"
+        
+            def __init__(self, state):
+                self.state = state
+        
+        class Originator():
+            "The Object in the application whose state changes"
+        
+            def __init__(self):
+                self._state = ""
+        
+            @property
+            def state(self):
+                "A `getter` for the objects state"
+                return self._state
+        
+            @state.setter
+            def state(self, state):
+                print(f"Originator: Setting state to `{state}`")
+                self._state = state
+        
+            @property
+            def memento(self):
+                "A `getter` for the objects state but packaged as a Memento"
+                print("Originator: Providing Memento of state to caretaker.")
+                return Memento(self._state)
+        
+            @memento.setter
+            def memento(self, memento):
+                self._state = memento.state
+                print(
+                    f"Originator: State after restoring from Memento: "
+                    f"`{self._state}`")
+        
+        class CareTaker():
+            "Guardian. Provides a narrow interface to the mementos"
+        
+            def __init__(self, originator):
+                self._originator = originator
+                self._mementos = []
+        
+            def create(self):
+                "Store a new Memento of the Originators current state"
+                print("CareTaker: Getting a copy of Originators current state")
+                memento = self._originator.memento
+                self._mementos.append(memento)
+        
+            def restore(self, index):
+                """
+                Replace the Originators current state with the state
+                stored in the saved Memento
+                """
+                print("CareTaker: Restoring Originators state from Memento")
+                memento = self._mementos[index]
+                self._originator.memento = memento
+        
+        # The Client
+        ORIGINATOR = Originator()
+        CARETAKER = CareTaker(ORIGINATOR)
+        
+        # originators state can change periodically due to application events
+        ORIGINATOR.state = "State #1"
+        ORIGINATOR.state = "State #2"
+        
+        # lets backup the originators
+        CARETAKER.create()
+        
+        # more changes, and then another backup
+        ORIGINATOR.state = "State #3"
+        CARETAKER.create()
+        
+        # more changes
+        ORIGINATOR.state = "State #4"
+        print(ORIGINATOR.state)
+        
+        # restore from first backup
+        CARETAKER.restore(0)
+        print(ORIGINATOR.state)
+        
+        # restore from second backup
+        CARETAKER.restore(1)
+        print(ORIGINATOR.state)
+        ```
+        
+    - Observer pattern
+        
+        ```python
+        '''
+        Problem 🥲
+        two types of objects: a Customer and a Store. The customer is very interested in a particular  product
+         which should become available in the store very soon.
+        The customer could visit the store every day and check product availability. But while the product is
+         still, en route, most of these trips would be pointless.
+        
+        Solution 😁
+        The object that has some interesting state is often called the subject, but since it’s also going to notify other objects about the changes 
+        to its state, we’ll call it the publisher. All other objects that want to track changes to the publisher’s state are called subscribers.
+        
+        The Observer pattern suggests that you add a subscription mechanism to the publisher class so individual objects can subscribe to or 
+        unsubscribe from a stream of events coming from that publisher. Fear not! Everything isn’t as complicated as it sounds. 
+        In reality, this mechanism consists of 1) an array field for storing a list of references to subscriber objects and 2) several public
+         methods that allow adding subscribers to and removing them from that list.
+        
+        '''
+        
+        ```
+        
+        ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/e56aca97-de2a-4a0f-a764-707427895d49/Untitled.png)
+        
+        ```python
+        class Subject:
+            def __init__(self):
+                self._observers = []
+        
+            def attach(self, observer):
+                self._observers.append(observer)
+        
+            def detach(self, observer):
+                self._observers.remove(observer)
+        
+            def notify(self, message):
+                for observer in self._observers:
+                    observer.update(message)
+        
+        class Observer:
+            def update(self, message):
+                raise NotImplementedError
+        
+        # Example Usage
+        
+        class ConcreteSubject(Subject):
+            def __init__(self):
+                super().__init__()
+                self._state = None
+        
+            def get_state(self):
+                return self._state
+        
+            def set_state(self, state):
+                self._state = state
+                self.notify(state)
+        
+        class ConcreteObserver(Observer):
+            def update(self, message):
+                print("Received message:", message)
+        
+        # Usage of the example
+        
+        subject = ConcreteSubject()
+        observer1 = ConcreteObserver()
+        observer2 = ConcreteObserver()
+        
+        subject.attach(observer1)
+        subject.attach(observer2)
+        
+        subject.set_state("New state")
+        
+        subject.detach(observer2)
+        
+        subject.set_state("Another state")
+        ```
+        
+        ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/090f0793-dcce-4122-b919-64dc8c68f8c3/Untitled.png)
+        
+        ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/148b1574-4fc9-4ba0-a487-e0a22f421e86/Untitled.png)
+        
+        ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/9fe34402-89fc-4217-921b-1322c23b5570/Untitled.png)
+        
+    - State pattern
+        
+        ```python
+        problem 🥲
+        Document class. A document can be in one of three states: Draft, Moderation, and Published. 
+        The publish method of the document works a little bit differently in each state:
+        State machines are usually implemented with lots of conditional statements (if or switch) 
+        
+        The biggest weakness of a state machine any change to the transition logic may require changing state conditionals in 
+        every method.
+        The problem tends to get bigger as a project evolves. It’s quite difficult to predict all possible states and 
+        
+        solution 😄
+        The State pattern suggests that you create new classes for all possible states 
+        the original object, called context, stores a reference to one of the state objects current state
+        
+        To transition the context into another state, replace the active state object with another object
+         if all state classes follow the same interface and the context itself works with these objects through that interface.
+        
+        This structure may look similar to the Strategy pattern, 
+        difference.
+        In the State pattern, the particular states may be aware of each other and initiate transitions from one state 
+        to another, whereas strategies almost never know about each other.
+        ```
+        
+        ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/4ee9d886-538e-403f-a017-2e0ebe7da67c/Untitled.png)
+        
+        ```python
+        
+        class Context:
+            def __init__(self, state):
+                self._state = state
+        
+            def set_state(self, state):
+                self._state = state
+        
+            def request(self):
+                self._state.handle()
+        
+        class State:
+            def handle(self):
+                raise NotImplementedError
+        
+        # Example Usage
+        
+        class ConcreteStateA(State):
+            def handle(self):
+                print("ConcreteStateA handles the request.")
+                # Change the state if needed
+                # context.set_state(ConcreteStateB())
+        
+        class ConcreteStateB(State):
+            def handle(self):
+                print("ConcreteStateB handles the request.")
+                # Change the state if needed
+                # context.set_state(ConcreteStateC())
+        
+        class ConcreteStateC(State):
+            def handle(self):
+                print("ConcreteStateC handles the request.")
+                # Change the state if needed
+                # context.set_state(ConcreteStateA())
+        
+        # Usage of the example
+        
+        context = Context(ConcreteStateA())
+        context.request()  # Output: ConcreteStateA handles the request.
+        
+        context.set_state(ConcreteStateB())
+        context.request()  # Output: ConcreteStateB handles the request.
+        
+        context.set_state(ConcreteStateC())
+        context.request()  # Output: ConcreteStateC handles the request.
+        ```
+        
+    - Strategy pattern
+        
+        ```python
+        
+        '''
+        Problem
+         Each time you added a new routing algorithm, the main class of the navigator doubled in size. At some point, 
+        
+        the beast became too hard to maintain.
+        The code of the navigator became very bloated, bloated
+        
+        Any change to one of the algorithms, whether it was a simple bug fix or a slight adjustment of the street score,
+        
+         affected the whole class, increasing the chance of creating an error in already-working code.
+        
+        complain that they spend too much time resolving merge conflicts. Implementing a new feature requires you to change 
+        the same huge class, conflicting with the code produced by other people.
+        '''
+        
+        ```
+        
+        ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/63d4e883-3702-4eb3-bf17-191c99bd8e5c/Untitled.png)
+        
+        ```python
+        '''
+        The Strategy pattern suggests that you take a class that does something specific in a lot of different ways 
+        and extract all of these algorithms into separate classes called strategies.
+        
+        The original class, called context, must have a field for storing a reference to one of the strategies. 
+        The context delegates the work to a linked strategy object instead of executing it on its own.
+        
+        The context isn’t responsible for selecting an appropriate algorithm for the job. Instead, the client passes the
+         desired strategy to the context. In fact, the context doesn’t know much about strategies. It works with all
+         strategies through the same generic interface, which only exposes a single method for triggering the algorithm 
+        encapsulated within the selected strategy.
+        
+        This way the context becomes independent of concrete strategies, so you can add new algorithms or modify existing 
+        ones without changing the code of the context or other strategies.
+        
+        Route planning strategies
+        
+        In our navigation app, each routing algorithm can be extracted to its own class with a single buildout method. 
+         the method accepts an origin and destination and returns a collection of the route’s checkpoints.
+        
+        Even though given the same arguments, each routing class might build a different route, the main navigator class 
+        doesn’t really care which algorithm is selected since its primary job is to render a set of checkpoints on the map. 
+        The class has a method for switching the active routing strategy, so its clients, such as the buttons in the user
+         interface, can replace the currently selected routing behavior with another one.
+        '''
+        ```
+        
+        ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/0977df88-bc17-46a4-ae81-11463d8e9fcc/Untitled.png)
+        
+        ```python
+        # Step 1: Define the strategy interface
+        class SortingStrategy:
+            def sort(self, array):
+                raise NotImplementedError()
+        
+        # Step 2: Implement concrete strategies
+        class BubbleSortStrategy(SortingStrategy):
+            def sort(self, array):
+                # Implementation of bubble sort algorithm
+                # ...
+        
+        class QuickSortStrategy(SortingStrategy):
+            def sort(self, array):
+                # Implementation of quick sort algorithm
+                # ...
+        
+        # Step 3: Use composition
+        class Sorter:
+            def __init__(self):
+                self.strategy = None
+        
+            def set_strategy(self, strategy):
+                self.strategy = strategy
+        
+            def sort_array(self, array):
+                if self.strategy is None:
+                    raise ValueError("Strategy not set")
+                self.strategy.sort(array)
+        
+        # Step 4: Make strategies interchangeable
+        if __name__ == "__main__":
+            sorter = Sorter()
+        
+            array = [5, 2, 7, 1, 3]
+        
+            sorter.set_strategy(BubbleSortStrategy())
+            sorter.sort_array(array)
+        
+            # Output: Bubble sort implementation
+        
+            sorter.set_strategy(QuickSortStrategy())
+            sorter.sort_array(array)
+        
+            # Output: Quick sort implementation
+        ```
+        
+    - Template Method pattern
+        
+        ```python
+        '''
+        Problem
+        
+        The first version of the app could work only with DOC files. In the following version, it was able to support
+         CSV files. A month later, you “taught” it to extract data from PDF files.
+        
+        Data mining classes contained a lot of duplicate code
+        
+        There was another problem related to the client code that used these classes. It had lots of conditionals that
+         picked a proper course of action depending on the class of the processing object. If all three processing classes
+         had a common interface or a base class, you’d be able to eliminate the conditionals in client code and use polymorphism
+         when calling methods on a processing object.
+        '''
+        ```
+        
+        !https://refactoring.guru/images/patterns/diagrams/template-method/problem.png
+        
+        ```python
+        '''
+        Solution
+        The Template Method pattern suggests that you break down an algorithm into a series of steps, turn these steps into
+         methods, and put a series of calls to these methods inside a single template method. The steps may either be abstract
+         or have some default implementation. To use the algorithm, the client is supposed to provide its own subclass, 
+        implement all abstract steps, and override some of the optional ones if needed (but not the template method itself).
+        
+        Define the abstract base class: Create an abstract class that defines the overall structure of the algorithm. 
+         the class contains a template method that outlines the steps of the algorithm using abstract methods or hooks.
+        
+        Implement concrete subclasses: Create concrete subclasses that inherit from the base class. These subclasses provide 
+        specific implementations for the abstract methods or hooks defined in the base class.
+        
+        Define template method: The template method in the base class defines the algorithm's structure by calling the abstract
+        
+        methods or hooks at specific points. It represents the overall sequence of steps and controls the flow of the algorithm.
+        
+        Customize the algorithm: Subclasses can override the abstract methods or hooks to provide their own implementations, 
+        thus customizing specific steps of the algorithm.
+        '''
+        ```
+        
+        ```python
+        # Step 1: Define the abstract base class
+        from abc import ABC, abstractmethod
+        
+        class AbstractClass(ABC):
+            def template_method(self):
+                self.common_operation_1()
+                self.customizable_operation_1()
+                self.common_operation_2()
+                self.customizable_operation_2()
+        
+            def common_operation_1(self):
+                print("Performing common operation 1")
+        
+            def common_operation_2(self):
+                print("Performing common operation 2")
+        
+            @abstractmethod
+            def customizable_operation_1(self):
+                pass
+        
+            @abstractmethod
+            def customizable_operation_2(self):
+                pass
+        
+        # Step 2: Implement concrete subclasses
+        class ConcreteClassA(AbstractClass):
+            def customizable_operation_1(self):
+                print("Performing operation 1 specific to ConcreteClassA")
+        
+            def customizable_operation_2(self):
+                print("Performing operation 2 specific to ConcreteClassA")
+        
+        class ConcreteClassB(AbstractClass):
+            def customizable_operation_1(self):
+                print("Performing operation 1 specific to ConcreteClassB")
+        
+            def customizable_operation_2(self):
+                print("Performing operation 2 specific to ConcreteClassB")
+        
+        # Step 3 and 4: Use the template method and customize the algorithm
+        if __name__ == "__main__":
+            concrete_a = ConcreteClassA()
+            concrete_a.template_method()
+        
+            # Output:
+            # Performing common operation 1
+            # Performing operation 1 specific to ConcreteClassA
+            # Performing common operation 2
+            # Performing operation 2 specific to ConcreteClassA
+        
+            concrete_b = ConcreteClassB()
+            concrete_b.template_method()
+        
+            # Output:
+            # Performing common operation 1
+            # Performing operation 1 specific to ConcreteClassB
+            # Performing common operation 2
+            # Performing operation 2 specific to ConcreteClassB
+        ```
+        
+    - Visitor pattern
+        
+        <aside>
+        💡 
+        probem **😓**
+        
+         that your team develops an app that works with geographic information structured as one colossal graph. Each node of the graph may represent a complex entity such as a city, but also more granular things like industries, sightseeing areas, etc. The nodes are connected with others if there’s a road between the real objects that they represent. Under the hood, each node type is represented by its own class, while each specific node is an object.
+        
+        !https://refactoring.guru/images/patterns/diagrams/visitor/problem1.png
+        
+        *Exporting the graph into XML.*
+        
+        At some point, you got a task to implement exporting the graph into XML format. At first, the job seemed pretty straightforward. You planned to add an export method to each node class and then leverage recursion to go over each node of the graph, executing the export method. The solution was simple and elegant: thanks to polymorphism, you weren’t coupling the code which called the export method to concrete classes of nodes.
+        
+        Unfortunately, the system architect refused to allow you to alter existing node classes. He said that the code was already in production and he didn’t want to risk breaking it because of a potential bug in your changes.
+        
+        !https://refactoring.guru/images/patterns/diagrams/visitor/problem2-en.png
+        
+        *The XML export method had to be added into all node classes, which bore the risk of breaking the whole application if any bugs slipped through along with the change.*
+        
+        Besides, he questioned whether it makes sense to have the XML export code within the node classes. The primary job of these classes was to work with geodata. The XML export behavior would look alien there.
+        
+        There was another reason for the refusal. It was highly likely that after this feature was implemented, someone from the marketing department would ask you to provide the ability to export into a different format, or request some other weird stuff. This would force you to change those precious and fragile classes again.
+        
+        ## **Solution 😁**
+        
+        The Visitor pattern suggests that you place the new behavior into a separate class called *visitor*, instead of trying to integrate it into existing classes. The original object that had to perform the behavior is now passed to one of the visitor’s methods as an argument, providing the method access to all necessary data contained within the object.
+        
+        Now, what if that behavior can be executed over objects of different classes? For example, in our case with XML export, the actual implementation will probably be a little bit different across various node classes. Thus, the visitor class may define not one, but a set of methods, each of which could take arguments of different types, like this:
+        
+        ```python
+        # Element classes
+        
+        class ElementA:
+            def accept(self, visitor):
+                visitor.visit_element_a(self)
+        
+            def operation_a(self):
+                print("ElementA: Performing operation A")
+        
+        class ElementB:
+            def accept(self, visitor):
+                visitor.visit_element_b(self)
+        
+            def operation_b(self):
+                print("ElementB: Performing operation B")
+        
+        # Visitor interface
+        
+        class Visitor:
+            def visit_element_a(self, element):
+                pass
+        
+            def visit_element_b(self, element):
+                pass
+        
+        # Concrete visitors
+        
+        class ConcreteVisitor1(Visitor):
+            def visit_element_a(self, element):
+                print("ConcreteVisitor1: Visiting ElementA")
+                element.operation_a()
+        
+            def visit_element_b(self, element):
+                print("ConcreteVisitor1: Visiting ElementB")
+                element.operation_b()
+        
+        class ConcreteVisitor2(Visitor):
+            def visit_element_a(self, element):
+                print("ConcreteVisitor2: Visiting ElementA")
+                element.operation_a()
+        
+            def visit_element_b(self, element):
+                print("ConcreteVisitor2: Visiting ElementB")
+                element.operation_b()
+        
+        # Usage example
+        
+        elements = [ElementA(), ElementB()]
+        
+        visitor1 = ConcreteVisitor1()
+        visitor2 = ConcreteVisitor2()
+        
+        for element in elements:
+            element.accept(visitor1)
+        
+        for element in elements:
+            element.accept(visitor2)
+        ```
+        
+        ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/ee92233a-d5b0-4a85-bfcb-42c64e3347cc/Untitled.png)
+        
+        </aside>
+        
+    
+    ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/dfc266db-39eb-44d8-a86d-75f320a177a0/Untitled.png)
