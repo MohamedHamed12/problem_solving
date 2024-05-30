@@ -11,7 +11,7 @@ function preorderTraversalWithStack(root) {
     let result = [];
     while (stack.length > 0) {
         let node = stack.pop();
-        if (node) result.push(node.value);
+        result.push(node.value);
         if (node.right) stack.push(node.right);
         if (node.left) stack.push(node.left);
     }
@@ -21,11 +21,11 @@ function preorderTraversalWithStack(root) {
 function preorderTraversal(root) {
     let result = [];
     function dfs(node) {
-        if (node) {
+      
             result.push(node.value);
             if (node.left) dfs(node.left);
             if (node.right) dfs(node.right);
-        }
+        
     }
     dfs(root);
     return result;
